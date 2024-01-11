@@ -12,13 +12,15 @@ def encode_onehot(labels):
     return labels_onehot
 
 
-def load_data(path="./data/cora/", dataset="cora"):
+def load_data(path="./data/sumo/", dataset="test"):
     """Load citation network dataset (cora only for now)"""
     print('Loading {} dataset...'.format(dataset))
 
     idx_features_labels = np.genfromtxt("{}{}.content".format(path, dataset), dtype=np.dtype(str))
     features = sp.csr_matrix(idx_features_labels[:, 1:-1], dtype=np.float32)
+    origin_labels = idx_features_labels[:, -1]
     labels = encode_onehot(idx_features_labels[:, -1])
+
 
     # build graph
     idx = np.array(idx_features_labels[:, 0], dtype=np.int32)
@@ -32,20 +34,29 @@ def load_data(path="./data/cora/", dataset="cora"):
 
     features = normalize_features(features)
     adj = normalize_adj(adj + sp.eye(adj.shape[0]))
+    #比例一般设为6：2：2
+    #idx_train = range(1500)
+    #idx_val = range(1501, 2000)
+    #idx_test = range(2001, 2500)
+    length = features.shape[0]
+    idx_train = range(length*3//5)
+    idx_val = range(length*3//5+1, length*4//5)
+    idx_test = range(length*4//5+1, length-1)
 
-    idx_train = range(140)
-    idx_val = range(200, 500)
-    idx_test = range(500, 1500)
+    #idx_train = range(324)
+    #idx_val = range(325, 432)
+    #idx_test = range(433, 540)
 
     adj = torch.FloatTensor(np.array(adj.todense()))
     features = torch.FloatTensor(np.array(features.todense()))
     labels = torch.LongTensor(np.where(labels)[1])
+#    np.savetxt(r'out', np.array(edges), encoding='utf-8', fmt='%s')
 
     idx_train = torch.LongTensor(idx_train)
     idx_val = torch.LongTensor(idx_val)
     idx_test = torch.LongTensor(idx_test)
 
-    return adj, features, labels, idx_train, idx_val, idx_test
+    return adj, features, labels, idx_train, idx_val, idx_test, origin_labels
 
 
 def normalize_adj(mx):

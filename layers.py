@@ -11,8 +11,8 @@ class GraphAttentionLayer(nn.Module):
     def __init__(self, in_features, out_features, dropout, alpha, concat=True):
         super(GraphAttentionLayer, self).__init__()
         self.dropout = dropout
-        self.in_features = in_features
-        self.out_features = out_features
+        self.in_features = in_features#节点向量的特征维度
+        self.out_features = out_features#经过gat后输出的特征维度
         self.alpha = alpha
         self.concat = concat
 
@@ -20,19 +20,18 @@ class GraphAttentionLayer(nn.Module):
         nn.init.xavier_uniform_(self.W.data, gain=1.414)
         self.a = nn.Parameter(torch.empty(size=(2*out_features, 1)))
         nn.init.xavier_uniform_(self.a.data, gain=1.414)
-
         self.leakyrelu = nn.LeakyReLU(self.alpha)
 
     def forward(self, h, adj):
         Wh = torch.mm(h, self.W) # h.shape: (N, in_features), Wh.shape: (N, out_features)
         e = self._prepare_attentional_mechanism_input(Wh)
-
-        zero_vec = -9e15*torch.ones_like(e)
+        zero_vec = -9e15*torch.ones_like(e)#将没有连接的边置为负无穷
         attention = torch.where(adj > 0, e, zero_vec)
-        attention = F.softmax(attention, dim=1)
-        attention = F.dropout(attention, self.dropout, training=self.training)
+        attention = F.softmax(attention, dim=1)#得到归一化的权重系数
+        #attention = F.dropout(attention, self.dropout, training=self.training)
+        attention = F.dropout(attention, self.dropout)
+        #print(attention[0][:31])
         h_prime = torch.matmul(attention, Wh)
-
         if self.concat:
             return F.elu(h_prime)
         else:

@@ -3,6 +3,7 @@ from __future__ import print_function
 
 import os
 import glob
+import pdb
 import time
 import random
 import argparse
@@ -22,12 +23,12 @@ parser.add_argument('--no-cuda', action='store_true', default=False, help='Disab
 parser.add_argument('--fastmode', action='store_true', default=False, help='Validate during training pass.')
 parser.add_argument('--sparse', action='store_true', default=False, help='GAT with sparse version or not.')
 parser.add_argument('--seed', type=int, default=72, help='Random seed.')
-parser.add_argument('--epochs', type=int, default=10000, help='Number of epochs to train.')
+parser.add_argument('--epochs', type=int, default=2000, help='Number of epochs to train.')
 parser.add_argument('--lr', type=float, default=0.005, help='Initial learning rate.')
 parser.add_argument('--weight_decay', type=float, default=5e-4, help='Weight decay (L2 loss on parameters).')
-parser.add_argument('--hidden', type=int, default=8, help='Number of hidden units.')
-parser.add_argument('--nb_heads', type=int, default=8, help='Number of head attentions.')
-parser.add_argument('--dropout', type=float, default=0.6, help='Dropout rate (1 - keep probability).')
+parser.add_argument('--hidden', type=int, default=20, help='Number of hidden units.')
+parser.add_argument('--nb_heads', type=int, default=20, help='Number of head attentions.')
+parser.add_argument('--dropout', type=float, default=0.4, help='Dropout rate (1 - keep probability).')
 parser.add_argument('--alpha', type=float, default=0.2, help='Alpha for the leaky_relu.')
 parser.add_argument('--patience', type=int, default=100, help='Patience')
 
@@ -41,7 +42,7 @@ if args.cuda:
     torch.cuda.manual_seed(args.seed)
 
 # Load data
-adj, features, labels, idx_train, idx_val, idx_test = load_data()
+adj, features, labels, idx_train, idx_val, idx_test, origin_labels = load_data()
 
 # Model and optimizer
 if args.sparse:
@@ -58,8 +59,8 @@ else:
                 dropout=args.dropout, 
                 nheads=args.nb_heads, 
                 alpha=args.alpha)
-optimizer = optim.Adam(model.parameters(), 
-                       lr=args.lr, 
+optimizer = optim.Adam(model.parameters(),
+                       lr=args.lr,
                        weight_decay=args.weight_decay)
 
 if args.cuda:
@@ -80,6 +81,7 @@ def train(epoch):
     optimizer.zero_grad()
     output = model(features, adj)
     loss_train = F.nll_loss(output[idx_train], labels[idx_train])
+    #loss_train = F.cross_entropy(output[idx_train], labels[idx_train])
     acc_train = accuracy(output[idx_train], labels[idx_train])
     loss_train.backward()
     optimizer.step()
@@ -91,6 +93,7 @@ def train(epoch):
         output = model(features, adj)
 
     loss_val = F.nll_loss(output[idx_val], labels[idx_val])
+    #loss_val = F.cross_entropy(output[idx_val], labels[idx_val])
     acc_val = accuracy(output[idx_val], labels[idx_val])
     print('Epoch: {:04d}'.format(epoch+1),
           'loss_train: {:.4f}'.format(loss_train.data.item()),
@@ -106,6 +109,7 @@ def compute_test():
     model.eval()
     output = model(features, adj)
     loss_test = F.nll_loss(output[idx_test], labels[idx_test])
+    #loss_test = F.cross_entropy(output[idx_test], labels[idx_test])
     acc_test = accuracy(output[idx_test], labels[idx_test])
     print("Test set results:",
           "loss= {:.4f}".format(loss_test.data.item()),
@@ -119,12 +123,12 @@ best = args.epochs + 1
 best_epoch = 0
 for epoch in range(args.epochs):
     loss_values.append(train(epoch))
-
     torch.save(model.state_dict(), '{}.pkl'.format(epoch))
     if loss_values[-1] < best:
         best = loss_values[-1]
         best_epoch = epoch
         bad_counter = 0
+        print(best_epoch)
     else:
         bad_counter += 1
 
@@ -148,6 +152,7 @@ print("Total time elapsed: {:.4f}s".format(time.time() - t_total))
 
 # Restore best model
 print('Loading {}th epoch'.format(best_epoch))
+
 model.load_state_dict(torch.load('{}.pkl'.format(best_epoch)))
 
 # Testing
